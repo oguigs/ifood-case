@@ -2,10 +2,11 @@
 # MAGIC %md
 # MAGIC # Análise Exploratória — Camada Bronze
 # MAGIC
-# MAGIC EDA executada **antes** da definição das regras de qualidade: as regras da
-# MAGIC silver não foram arbitradas, foram derivadas do que esta análise revelou
-# MAGIC (nulos em `passenger_count`, valores não positivos em `total_amount`,
-# MAGIC registros fora do período Jan–Mai/2023, duplicatas).
+# MAGIC Rodei essa EDA antes de decidir qualquer regra de qualidade — não o
+# MAGIC contrário. As regras que acabaram na camada silver (nulos em
+# MAGIC `passenger_count`, valores não positivos em `total_amount`, registros fora
+# MAGIC do período Jan–Mai/2023, duplicatas) saíram do que essa análise mostrou,
+# MAGIC não de suposição.
 
 # COMMAND ----------
 
@@ -24,11 +25,12 @@ df_yellow.select(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Distribuição de `total_amount`
+# MAGIC ## Distribuição de total_amount
 # MAGIC
-# MAGIC O summary revela a cauda da distribuição (mínimos negativos = estornos;
-# MAGIC máximos extremos = outliers). É a evidência por trás da regra
-# MAGIC `total_amount > 0` da camada silver.
+# MAGIC Dando uma olhada no summary dá pra ver a cauda da distribuição — mínimos
+# MAGIC negativos (que são estornos) e máximos bem fora da curva (outliers). Foi
+# MAGIC essa distribuição que me convenceu a colocar a regra `total_amount > 0` na
+# MAGIC silver.
 
 # COMMAND ----------
 
@@ -41,8 +43,9 @@ df_yellow.select("total_amount").summary(
 # MAGIC %md
 # MAGIC ## Volumetria mensal
 # MAGIC
-# MAGIC Confirma que o volume é consistente entre os meses (sem buracos de ingestão)
-# MAGIC e dimensiona o dataset (~16,5M de registros no período).
+# MAGIC Serve pra checar duas coisas ao mesmo tempo: se o volume é estável entre os
+# MAGIC meses (sem buraco de ingestão) e pra ter uma noção de tamanho do dataset
+# MAGIC estamos falando de algo em torno de 16,5 milhões de registros no período.
 
 # COMMAND ----------
 
@@ -59,10 +62,23 @@ df_yellow.select("total_amount").summary(
 # MAGIC %md
 # MAGIC ## Conclusões da EDA
 # MAGIC
-# MAGIC - [X]% de registros com `total_amount <= 0` (estornos/ajustes) e [Y]
-# MAGIC   registros fora do range Jan–Mai/2023 — ambos capturados pelas regras de
-# MAGIC   quarentena da silver.
-# MAGIC - `passenger_count` nulo em [Z]% dos registros — premissa: preservado na
-# MAGIC   silver, filtrado nas análises de passageiros.
-# MAGIC - Volume mensal consistente ao longo do período, sem buracos de ingestão.
-
+# MAGIC - **2,65%** dos registros (428.665 de 16.186.386) vieram com
+# MAGIC   `passenger_count` nulo. Decidi manter esses registros na silver — a
+# MAGIC   ausência de preenchimento pelo taxímetro não invalida a corrida pra quem
+# MAGIC   quer analisar receita — e só filtrar o nulo nas análises que dependem de
+# MAGIC   passageiros, como a pergunta 2.
+# MAGIC - **0,89%** (144.146 registros) têm `total_amount <= 0`. A distribuição
+# MAGIC   ajuda a entender por quê: o mínimo chega a -US$ 982,95 (claramente um
+# MAGIC   estorno), bem longe da mediana de US$ 20,60. Essa é a regra
+# MAGIC   `non_positive_total_amount` que vira quarentena na silver.
+# MAGIC - Olhando só pelo recorte estrito de datas, apenas 104 registros (67 antes
+# MAGIC   de janeiro, 37 depois de maio) ficam fora do range pedido. Mas a
+# MAGIC   volumetria mensal conta uma história mais interessante: tem registro
+# MAGIC   espalhado em anos completamente fora de qualquer contexto — 2001, 2002,
+# MAGIC   2003, 2008, 2009, 2014, 2022. Isso é claramente erro de relógio na fonte
+# MAGIC   da TLC, e é um bom exemplo de como uma olhada rápida nas bordas do
+# MAGIC   período não conta a história inteira — só apareceu de verdade ao agrupar
+# MAGIC   por mês.
+# MAGIC - Fora isso, o volume mensal se mantém estável entre janeiro e maio (na
+# MAGIC   faixa de 3 a 3,5 milhões de registros por mês), sem sinal de falha de
+# MAGIC   ingestão em nenhum mês.

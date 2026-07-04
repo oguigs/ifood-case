@@ -49,12 +49,16 @@ class SilverJob:
             ],
         )
         labeled = dq.apply_quality_rules(deduplicated, rules)
-        labeled.cache()
 
+        # Nota: não usamos .cache()/.persist() aqui de propósito — o
+        # Databricks Free Edition roda em compute serverless, que não
+        # suporta PERSIST TABLE. O DataFrame `labeled` é recalculado uma
+        # vez para cada escrita (silver e quarentena); para o volume deste
+        # case (~16M linhas), o custo extra é irrelevante frente ao ganho
+        # de rodar sem depender de compute clássico.
         passed, failed = dq.split_by_status(labeled)
         self._write_silver(passed)
         self._write_quarantine(failed)
-        labeled.unpersist()
 
         self._create_yellow_view()
 

@@ -2,29 +2,37 @@
 # MAGIC %md
 # MAGIC # Silver — Camada de consumo com quarentena de qualidade
 # MAGIC
-# MAGIC Unifica yellow + green, deduplica, aplica as regras de qualidade
-# MAGIC (`src/utils/data_quality.py`) e separa aprovados (consumo) de reprovados
-# MAGIC (quarentena). Lógica em `src/jobs/silver.py`.
+# MAGIC Aqui acontece a parte mais densa do pipeline: eu unifico yellow e green,
+# MAGIC removo duplicatas, aplico as regras de qualidade
+# MAGIC (`src/utils/data_quality.py`) e separo o que passou do que não passou. A
+# MAGIC lógica completa mora em `src/jobs/silver.py`.
 # MAGIC
-# MAGIC **Por que quarentena em vez de descartar:** registros reprovados são
-# MAGIC preservados em `taxi_trips_quarantine` com o motivo exato de cada falha.
-# MAGIC Isso dá auditabilidade (quantos registros por regra), permite monitorar
-# MAGIC regressões na fonte ao longo do tempo e viabiliza reprocessamento — em
-# MAGIC produção, dado descartado silenciosamente é dado irrecuperável.
+# MAGIC Uma escolha que vale explicar de cara: quando um registro reprova numa
+# MAGIC regra, eu não descarto ele — mando pra uma tabela de quarentena
+# MAGIC (`taxi_trips_quarantine`) junto com o motivo exato da reprovação. Descartar
+# MAGIC silenciosamente é fácil, mas em produção isso significa perder a chance de
+# MAGIC auditar quantos registros cada regra está pegando, ou de reprocessar depois
+# MAGIC se a regra mudar. Prefiro pagar um pouco mais de storage e manter tudo
+# MAGIC rastreável.
 # MAGIC
-# MAGIC **Por que dedup ANTES das regras de DQ:** duplicatas são um problema de
-# MAGIC identidade do registro, não de qualidade do conteúdo — um registro duplicado
-# MAGIC válido não deve poluir a quarentena.
+# MAGIC A deduplicação acontece antes da checagem de qualidade, de propósito.
+# MAGIC Duplicata é um problema de identidade do registro (o mesmo evento aparece
+# MAGIC duas vezes), não um problema do conteúdo em si — não faz sentido um
+# MAGIC registro válido duplicado ir parar na quarentena como se fosse erro de
+# MAGIC qualidade.
 # MAGIC
-# MAGIC **Premissa documentada — `passenger_count` NULL passa, zero não:** NULL
-# MAGIC significa campo não preenchido pelo taxímetro (comum na fonte TLC) e não
-# MAGIC invalida a corrida para análises de receita; zero é uma contagem inválida.
-# MAGIC Análises de passageiros (Q2) filtram NULL na própria query.
+# MAGIC Também documentei uma premissa que pode gerar dúvida: `passenger_count`
+# MAGIC nulo passa, mas zero não. Nulo geralmente significa que o taxímetro não
+# MAGIC preencheu o campo — isso é comum na fonte da TLC e não invalida a corrida
+# MAGIC para quem quer analisar receita. Zero, por outro lado, é uma contagem que
+# MAGIC não faz sentido físico. Quem for analisar passageiros (como na pergunta 2)
+# MAGIC filtra os nulos direto na query.
 # MAGIC
-# MAGIC **Por que particionar por `pickup_year, pickup_month`:** alinhado ao padrão
-# MAGIC de consulta do case — a Q1 agrega por mês e a Q2 filtra maio, ambas com
-# MAGIC partition pruning direto. `taxi_type` (2 valores) daria partições grandes
-# MAGIC demais e sem ganho para essas queries.
+# MAGIC Por fim, particiono a tabela por `pickup_year` e `pickup_month` em vez de
+# MAGIC `taxi_type`. Fiz essa escolha pensando no padrão de consulta do próprio
+# MAGIC case: a pergunta 1 agrupa por mês e a pergunta 2 filtra só maio — as duas
+# MAGIC se beneficiam de partition pruning dessa forma. Particionar por
+# MAGIC `taxi_type`, com só 2 valores possíveis, não ajudaria em nada aqui.
 
 # COMMAND ----------
 
@@ -37,16 +45,17 @@ from src.config import load_config
 from src.jobs.silver import SilverJob
 
 config = load_config()
-SilverJob(spark, config).run()
+SilverJob(spark, config).run()  # Avoid caching in serverless environment if cache() is called inside
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## Validação — volumetria por camada
 # MAGIC
-# MAGIC Conferência de sanidade: a soma bronze deve equivaler a silver + quarentena
-# MAGIC + duplicatas removidas. Esses números alimentam a tabela de premissas do
-# MAGIC README.
+# MAGIC Antes de seguir, vale conferir se as contas fecham: a soma da bronze
+# MAGIC (yellow + green) deve bater com silver + quarentena + o que foi removido
+# MAGIC na deduplicação. Os números que saem daqui vão direto pra tabela de
+# MAGIC premissas do README.
 
 # COMMAND ----------
 
@@ -66,10 +75,11 @@ SilverJob(spark, config).run()
 # MAGIC %md
 # MAGIC ## Auditoria da quarentena — falhas por motivo
 # MAGIC
-# MAGIC Cada regra de qualidade com sua contagem exata de registros capturados.
-# MAGIC É a evidência quantitativa que justifica cada premissa adotada — e, em
-# MAGIC produção, a série temporal dessas contagens é o sinal de alerta para
-# MAGIC regressões de qualidade na fonte.
+# MAGIC Essa query mostra quantos registros cada regra pegou, individualmente ou
+# MAGIC combinada com outras. É o jeito mais direto de defender cada premissa que
+# MAGIC documentei acima com número, não só com argumento — e, num cenário real de
+# MAGIC produção, acompanhar essa distribuição ao longo do tempo é justamente como
+# MAGIC se percebe se a qualidade da fonte está piorando.
 
 # COMMAND ----------
 
@@ -78,4 +88,3 @@ SilverJob(spark, config).run()
 # MAGIC FROM ifood_case.silver.taxi_trips_quarantine
 # MAGIC GROUP BY dq_failures
 # MAGIC ORDER BY qtd DESC;
-

@@ -2,18 +2,22 @@
 # MAGIC %md
 # MAGIC # Extração — NYC TLC → Landing Zone
 # MAGIC
-# MAGIC Download dos parquets oficiais (Jan–Mai/2023) para o Volume, preservando os
-# MAGIC arquivos originais intactos. Toda a lógica vive em `src/jobs/extract.py`;
-# MAGIC este notebook apenas orquestra.
+# MAGIC Aqui a gente baixa os parquets oficiais de janeiro a maio de 2023 e joga no
+# MAGIC volume, sem mexer em nada — os arquivos ficam exatamente como vieram da
+# MAGIC fonte. Toda a lógica está em `src/jobs/extract.py`; este notebook só chama
+# MAGIC a classe e roda.
 # MAGIC
-# MAGIC **Por que yellow E green:** a pergunta 2 do case pede "todos os táxis da
-# MAGIC frota". Incluir os green taxis (colunas `lpep_*`) atende ao enunciado de
-# MAGIC forma literal — a unificação de nomes acontece na silver.
+# MAGIC Uma decisão que vale explicar: baixei yellow e green, não só yellow. A
+# MAGIC pergunta 2 do case pede a média considerando "todos os táxis da frota",
+# MAGIC então deixar o green de fora seria responder uma pergunta diferente da que
+# MAGIC foi feita. A unificação de nomes de coluna (`lpep_*` vs `tpep_*`) fica pra
+# MAGIC frente, na camada silver.
 # MAGIC
-# MAGIC **Por que retry com backoff e escrita em `.tmp`:** o CDN da TLC pode falhar
-# MAGIC transitoriamente; o retry evita rerun manual e o arquivo temporário renomeado
-# MAGIC ao final garante que um download interrompido nunca deixe um parquet
-# MAGIC corrompido na landing zone (escrita atômica).
+# MAGIC Também coloquei retry com backoff no download. O CDN da TLC falha de vez em
+# MAGIC quando por instabilidade de rede, e sem isso eu ia ter que ficar rodando o
+# MAGIC notebook manualmente até dar certo. A escrita passa primeiro por um arquivo
+# MAGIC `.tmp` que só é renomeado no final — assim, se cair no meio do download, não
+# MAGIC sobra um parquet corrompido na landing zone.
 
 # COMMAND ----------
 
@@ -27,4 +31,3 @@ from src.jobs.extract import ExtractJob
 
 config = load_config()
 ExtractJob(config).run()
-

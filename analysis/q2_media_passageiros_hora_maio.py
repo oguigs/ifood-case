@@ -2,13 +2,16 @@
 # MAGIC %md
 # MAGIC # Pergunta 2 — Média de passageiros por hora do dia em maio (todos os táxis)
 # MAGIC
-# MAGIC "Todos os táxis da frota" = yellow + green, unificados na silver com a
-# MAGIC coluna `taxi_type`. O filtro de maio usa as colunas de partição
-# MAGIC (partition pruning).
+# MAGIC "Todos os táxis da frota" é a parte que mais importa nessa pergunta — por
+# MAGIC isso a query roda sobre yellow e green juntos, já unificados na silver pela
+# MAGIC coluna `taxi_type`. O filtro de maio usa as colunas de partição, então o
+# MAGIC Spark nem chega a olhar os outros meses.
 # MAGIC
-# MAGIC **Premissa:** registros com `passenger_count` NULL são excluídos apenas
-# MAGIC desta análise (campo não preenchido não é evidência de zero passageiros);
-# MAGIC eles permanecem na silver para análises de receita.
+# MAGIC Um detalhe que decidi na hora de escrever essa query: registros com
+# MAGIC `passenger_count` nulo entram fora do cálculo aqui, mas só aqui — eles
+# MAGIC continuam existindo na silver normalmente, porque campo vazio não é a
+# MAGIC mesma coisa que zero passageiro, e não queria distorcer a média por causa
+# MAGIC disso.
 
 # COMMAND ----------
 
@@ -30,8 +33,9 @@
 # MAGIC %md
 # MAGIC ## Leitura de negócio
 # MAGIC
-# MAGIC A média é mais alta na madrugada (0h–3h, ~1,45) e à noite (20h–23h) —
-# MAGIC deslocamentos em grupo após eventos sociais — e mínima às 6h (~1,26),
-# MAGIC horário de corridas individuais para o trabalho. No horário comercial
-# MAGIC (7h–19h) mantém-se estável entre 1,35 e 1,40.
-
+# MAGIC O padrão que aparece no gráfico faz bastante sentido intuitivo: a média
+# MAGIC sobe na madrugada (0h às 3h, por volta de 1,45 passageiros) e de novo à
+# MAGIC noite (20h às 23h) — provavelmente gente voltando em grupo de algum
+# MAGIC compromisso social. O ponto mais baixo é às 6h da manhã, perto de 1,26, que
+# MAGIC bate com o horário de quem está indo sozinho para o trabalho. No resto do
+# MAGIC horário comercial (7h às 19h) a média fica bem estável, entre 1,35 e 1,40.

@@ -2,20 +2,27 @@
 # MAGIC %md
 # MAGIC # Bronze — Dado cru em Delta com metadados de ingestão
 # MAGIC
-# MAGIC Lógica em `src/jobs/bronze.py` + `src/utils/schemas.py`.
+# MAGIC A lógica está dividida entre `src/jobs/bronze.py` e `src/utils/schemas.py`.
 # MAGIC
-# MAGIC **Por que ler arquivo a arquivo com cast explícito (e não `spark.read` na
-# MAGIC pasta inteira):** os parquets de 2023 têm **schema drift entre meses** —
-# MAGIC `passenger_count` aparece como int64 em alguns arquivos e double em outros.
-# MAGIC O cast por arquivo para um schema alvo torna o union determinístico, em vez
-# MAGIC de depender de coerção implícita de tipos.
+# MAGIC O ponto que mais me chamou atenção nessa etapa: os parquets de 2023 não têm
+# MAGIC um schema estável entre os meses. `passenger_count`, por exemplo, aparece
+# MAGIC como `int64` em alguns arquivos e `double` em outros. Se eu simplesmente
+# MAGIC lesse a pasta inteira com `spark.read.parquet(pasta)`, o Spark ia inferir um
+# MAGIC schema por conta própria e provavelmente ia dar problema no union entre os
+# MAGIC meses. Por isso leio arquivo por arquivo e aplico um cast explícito para um
+# MAGIC schema alvo antes de unir tudo — assim eu controlo o resultado em vez de
+# MAGIC torcer para a coerção implícita funcionar.
 # MAGIC
-# MAGIC **Por que `_source_file` e `_ingestion_ts`:** rastreabilidade — qualquer
-# MAGIC registro da bronze pode ser auditado até o arquivo de origem e o momento da
-# MAGIC ingestão, pré-requisito de um data lake auditável.
+# MAGIC Também adiciono duas colunas de controle, `_source_file` e
+# MAGIC `_ingestion_ts`. Isso não é exigido pelo enunciado, mas é barato de fazer e
+# MAGIC me dá rastreabilidade: se um número parecer estranho lá na frente, dá pra
+# MAGIC voltar e saber exatamente de qual arquivo e de qual momento de ingestão ele
+# MAGIC veio.
 # MAGIC
-# MAGIC **Por que a bronze não filtra nada:** esta camada é o fato imutável. Manter
-# MAGIC o dado cru permite reprocessar a silver com novas regras sem voltar à fonte.
+# MAGIC E por que a bronze não aplica nenhum filtro de qualidade? Porque essa
+# MAGIC camada representa o dado como ele chegou — o "fato bruto". Se um dia eu
+# MAGIC precisar mudar uma regra de qualidade, quero poder reprocessar a silver a
+# MAGIC partir da bronze sem ter que baixar tudo de novo da fonte.
 
 # COMMAND ----------
 
@@ -29,4 +36,3 @@ from src.jobs.bronze import BronzeJob
 
 config = load_config()
 BronzeJob(spark, config).run()
-
