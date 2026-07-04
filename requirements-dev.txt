@@ -1,0 +1,6 @@
+# Desenvolvimento local e CI
+pyspark==3.5.1
+pytest==8.2.0
+flake8==7.0.0
+requests>=2.31
+pyyaml>=6.0

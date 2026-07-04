@@ -1,1 +1,3 @@
+# Dependencias de runtime no Databricks
 requests>=2.31
+pyyaml>=6.0

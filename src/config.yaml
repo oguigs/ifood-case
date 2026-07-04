@@ -1,0 +1,34 @@
+catalog: ifood_case
+
+schemas:
+  bronze: bronze
+  silver: silver
+  gold: gold
+
+landing_volume: /Volumes/ifood_case/bronze/landing
+
+source:
+  base_url: https://d37ci6vzurychx.cloudfront.net/trip-data
+  year: 2023
+  months: [1, 2, 3, 4, 5]
+
+# Mapeia cada tipo de taxi para os nomes originais de colunas de data/hora.
+# yellow usa prefixo tpep_, green usa lpep_ (mesma semantica, nomes diferentes).
+taxi_types:
+  yellow:
+    pickup_col: tpep_pickup_datetime
+    dropoff_col: tpep_dropoff_datetime
+  green:
+    pickup_col: lpep_pickup_datetime
+    dropoff_col: lpep_dropoff_datetime
+
+quality:
+  min_pickup_date: "2023-01-01"
+  max_pickup_date_exclusive: "2023-06-01"
+  max_trip_duration_hours: 24
+
+download:
+  retries: 3
+  backoff_seconds: 5
+  chunk_size_bytes: 8192
+  timeout_seconds: 300
