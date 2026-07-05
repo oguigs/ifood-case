@@ -114,26 +114,39 @@ enunciado (`tpep_pickup_datetime`, `tpep_dropoff_datetime`) pode usar a view
 
 ```
 ifood-case/
+├─ .github/
+│  └─ workflows/
+│     └─ ci.yml               # roda flake8 + pytest a cada push
 ├─ src/
 │  ├─ jobs/
-│  │  ├─ extract.py          # ExtractJob: download TLC → landing (retry + chunks)
-│  │  ├─ bronze.py           # BronzeJob: cast explícito por arquivo + union
-│  │  └─ silver.py           # SilverJob: dedup + quarentena + particionamento + view
+│  │  ├─ extract.py           # ExtractJob: download TLC → landing (retry + chunks)
+│  │  ├─ bronze.py            # BronzeJob: cast explícito por arquivo + union
+│  │  └─ silver.py            # SilverJob: dedup + quarentena + particionamento + view
 │  ├─ utils/
-│  │  ├─ data_quality.py     # regras de DQ como funções puras (testáveis)
-│  │  └─ schemas.py          # schema alvo (resolve o schema drift)
-│  ├─ config.py              # loader do YAML + helper de nomes de tabela
-│  ├─ config.yaml            # catálogo, período, tipos de táxi, regras, download
-│  └─ main.py                # CLI: python -m src.main <extract|bronze|silver|all>
-├─ notebooks/                # cascas finas que importam e executam os jobs
-├─ analysis/                 # EDA + respostas Q1/Q2 com visualizações
+│  │  ├─ data_quality.py      # regras de DQ como funções puras (testáveis)
+│  │  └─ schemas.py           # schema alvo (resolve o schema drift)
+│  ├─ config.py               # loader do YAML + helper de nomes de tabela
+│  ├─ config.yaml             # catálogo, período, tipos de táxi, regras, download
+│  └─ main.py                 # CLI: python -m src.main <extract|bronze|silver|all>
+├─ notebooks/
+│  ├─ 00_setup.py             # cria catálogo, schemas e volume no Unity Catalog
+│  ├─ 01_extract.py           # chama ExtractJob
+│  ├─ 02_bronze.py            # chama BronzeJob
+│  └─ 03_silver.py            # chama SilverJob + validação de volumetria e quarentena
+├─ analysis/
+│  ├─ exploratory_analysis.py       # EDA da camada bronze
+│  ├─ q1_media_total_amount.py      # resposta da pergunta 1
+│  └─ q2_media_passageiros_hora_maio.py  # resposta da pergunta 2
 ├─ tests/
-│  ├─ conftest.py            # SparkSession local
-│  └─ utils/                 # testes de DQ (14 casos) e de schema drift
-├─ .github/workflows/ci.yml  # flake8 + pytest a cada push
+│  ├─ conftest.py             # fixture de SparkSession local
+│  └─ utils/
+│     ├─ test_data_quality.py # 11 cenários de DQ + quarentena (parametrizados)
+│     └─ test_schemas.py      # teste do schema drift (VendorID/passenger_count)
 ├─ README.md
-├─ requirements.txt          # runtime Databricks (requests, pyyaml)
-└─ requirements-dev.txt      # desenvolvimento local e CI (pyspark, pytest, flake8)
+├─ requirements.txt           # runtime Databricks (requests, pyyaml)
+├─ requirements-dev.txt       # desenvolvimento local e CI (pyspark, pytest, flake8)
+├─ pytest.ini                 # aponta o pytest para a pasta tests/
+└─ setup.cfg                  # configuração do flake8
 ```
 
 ## Como Executar
